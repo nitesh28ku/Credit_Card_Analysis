@@ -68,3 +68,53 @@ COPY cust_detail
 FROM 'cust_add.csv' 
 DELIMITER ',' 
 CSV HEADER;
+
+-- ==============================================================================
+-- 5. Core Business Analytical Queries
+-- ==============================================================================
+
+-- 5.1 Overall Portfolio KPIs
+SELECT 
+    COUNT(DISTINCT Client_Num) AS total_customers,
+    SUM(Total_Trans_Amt + Interest_Earned + Annual_Fees) AS total_revenue,
+    SUM(Total_Trans_Amt) AS total_transaction_amount,
+    SUM(Total_Trans_Ct) AS total_transaction_count,
+    SUM(Interest_Earned) AS total_interest_earned,
+    SUM(Customer_Acq_Cost) AS total_cac,
+    ROUND(AVG(Avg_Utilization_Ratio) * 100, 2) AS avg_utilization_percentage
+FROM cc_detail;
+
+-- 5.2 Card Category Performance
+SELECT 
+    Card_Category,
+    COUNT(DISTINCT Client_Num) AS customer_count,
+    SUM(Total_Trans_Amt + Interest_Earned + Annual_Fees) AS total_revenue,
+    SUM(Total_Trans_Ct) AS total_transactions,
+    ROUND(AVG(Credit_Limit), 2) AS avg_credit_limit
+FROM cc_detail
+GROUP BY Card_Category
+ORDER BY total_revenue DESC;
+
+-- 5.3 Demographic Analysis (Age Groups)
+SELECT 
+    CASE 
+        WHEN c.Customer_Age < 30 THEN '20-30'
+        WHEN c.Customer_Age BETWEEN 30 AND 39 THEN '30-40'
+        WHEN c.Customer_Age BETWEEN 40 AND 49 THEN '40-50'
+        WHEN c.Customer_Age BETWEEN 50 AND 59 THEN '50-60'
+        ELSE '60+' 
+    END AS age_group,
+    COUNT(DISTINCT c.Client_Num) AS customer_count,
+    SUM(cc.Total_Trans_Amt + cc.Interest_Earned + cc.Annual_Fees) AS total_revenue,
+    SUM(cc.Total_Trans_Ct) AS total_transactions
+FROM cust_detail c
+JOIN cc_detail cc ON c.Client_Num = cc.Client_Num
+GROUP BY age_group
+ORDER BY total_revenue DESC;
+
+-- 5.4 Delinquency Rate
+SELECT 
+    COUNT(*) AS total_accounts,
+    SUM(CASE WHEN Delinquent_Acc = '1' THEN 1 ELSE 0 END) AS delinquent_accounts,
+    ROUND(SUM(CASE WHEN Delinquent_Acc = '1' THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 2) AS delinquency_rate_pct
+FROM cc_detail;
