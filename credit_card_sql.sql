@@ -118,3 +118,37 @@ SELECT
     SUM(CASE WHEN Delinquent_Acc = '1' THEN 1 ELSE 0 END) AS delinquent_accounts,
     ROUND(SUM(CASE WHEN Delinquent_Acc = '1' THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 2) AS delinquency_rate_pct
 FROM cc_detail;
+
+-- ==============================================================================
+-- 6. Performance Optimization & Reporting Views
+-- ==============================================================================
+
+-- 6.1 Indexes
+CREATE INDEX IF NOT EXISTS idx_cc_client_num ON cc_detail (Client_Num);
+CREATE INDEX IF NOT EXISTS idx_cust_client_num ON cust_detail (Client_Num);
+CREATE INDEX IF NOT EXISTS idx_cc_card_category ON cc_detail (Card_Category);
+
+-- 6.2 View for Week-over-Week (WoW) Analytics
+DROP VIEW IF EXISTS vw_weekly_kpis;
+CREATE VIEW vw_weekly_kpis AS
+WITH weekly_totals AS (
+    SELECT 
+        Week_Num,
+        Week_Start_Date,
+        SUM(Total_Trans_Amt + Interest_Earned + Annual_Fees) AS weekly_revenue,
+        SUM(Total_Trans_Ct) AS weekly_transactions
+    FROM cc_detail
+    GROUP BY Week_Num, Week_Start_Date
+)
+SELECT 
+    Week_Num,
+    Week_Start_Date,
+    weekly_revenue,
+    weekly_transactions,
+    LAG(weekly_revenue, 1) OVER (ORDER BY Week_Start_Date) AS prior_week_revenue,
+    ROUND(
+        (weekly_revenue - LAG(weekly_revenue, 1) OVER (ORDER BY Week_Start_Date)) * 100.0 /
+        NULLIF(LAG(weekly_revenue, 1) OVER (ORDER BY Week_Start_Date), 0),
+        2
+    ) AS wow_revenue_growth_pct
+FROM weekly_totals;
